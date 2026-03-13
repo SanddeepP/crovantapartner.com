@@ -858,83 +858,10 @@ footer {
 .footer-made { font-size:0.62rem; letter-spacing:0.14em; color:rgba(184,136,80,0.35); text-transform:uppercase; }
 
 /* ─── RESPONSIVE ─────────────────────────── */
-/* ── Hamburger ── */
-.hamburger {
-  display: none;
-  flex-direction: column;
-  justify-content: center;
-  gap: 5px;
-  cursor: pointer;
-  padding: 4px;
-  background: none;
-  border: none;
-  z-index: 1001;
-}
-.hamburger span {
-  display: block;
-  width: 24px;
-  height: 2px;
-  background: var(--gold-light);
-  border-radius: 2px;
-  transition: all 0.3s ease;
-}
-.hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-.hamburger.open span:nth-child(2) { opacity: 0; }
-.hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
-
-@media(max-width:768px) {
-  .hamburger { display: flex; }
-  nav { padding:18px 24px; }
-  nav.solid { padding:14px 24px; }
-
-  .nav-links {
-    display: none;
-    flex-direction: column;
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: var(--navy);
-    justify-content: center;
-    align-items: center;
-    gap: 36px;
-    z-index: 999;
-  }
-  .nav-links.open { display: flex; }
-  .nav-links a { font-size: 1.1rem; color: var(--cream) !important; }
-  .nav-cta {
-    font-size: 0.9rem !important;
-    padding: 12px 28px !important;
-    background: var(--gold) !important;
-    border-color: var(--gold) !important;
-    color: var(--navy) !important;
-  }
-
-  .hero { grid-template-columns:1fr; min-height:auto; }
-  .hero-left { padding:100px 24px 40px; }
-  .hero-right { padding:20px 24px 60px; gap:10px; }
-  .sec { padding:72px 24px; }
-  .services { padding:72px 24px; }
-  .founder { padding:72px 24px; }
-  .contact { padding:72px 24px; }
-  .pricing { padding:72px 24px; }
-  .who { padding:72px 24px; }
-  .process { padding:72px 24px; }
-  .about-grid,.services-top,.founder-grid,.contact-grid { grid-template-columns:1fr; gap:40px; }
-  .who-grid,.pricing-grid { grid-template-columns:1fr; }
-  .process-steps { grid-template-columns:1fr; }
-  .svc-panel.active { grid-template-columns:1fr; }
-  .svc-card-wide { grid-template-columns:1fr; }
-  .svc-wide-main,.svc-wide-features,.svc-wide-pricing { border:none; border-bottom:1px solid rgba(166,136,80,0.12); }
-  footer { padding:40px 24px; }
-  .footer-inner { grid-template-columns:1fr; gap:32px; }
-  .footer-bottom { flex-direction:column; gap:8px; text-align:center; }
-  .hero-h1 { font-size: clamp(2.4rem, 10vw, 4rem); }
-  .stats-row { grid-template-columns: 1fr 1fr; }
-}
-
-@media(max-width:960px) and (min-width:769px) {
+@media(max-width:960px) {
   nav { padding:20px 28px; }
   nav.solid { padding:14px 28px; }
-  .nav-links { gap:16px; }
+  .nav-links { gap:20px; }
   .hero { grid-template-columns:1fr; min-height:auto; }
   .hero-left { padding:100px 28px 40px; }
   .hero-right { padding:20px 28px 60px; gap:10px; }
@@ -1001,15 +928,15 @@ footer {
       <span class="logo-sub">Partners</span>
     </div>
   </a>
-  <button class="hamburger" id="hamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
-  <ul class="nav-links" id="navLinks">
-    <li><a href="#about" class="nav-mobile-link">About</a></li>
-    <li><a href="#services" class="nav-mobile-link">Services</a></li>
-    <li><a href="#who" class="nav-mobile-link">Who We Serve</a></li>
-    <li><a href="sandeep-raj-portfolio.html" target="_blank" class="nav-mobile-link">Founder</a></li>
-    <li><a href="#pricing" class="nav-mobile-link">Pricing</a></li>
+  <ul class="nav-links">
+    <li><a href="#about">About</a></li>
+    <li><a href="#services">Services</a></li>
+    <li><a href="#who">Who We Serve</a></li>
+    <li><a href="sandeep-raj-portfolio.html" target="_blank">Founder</a></li>
+    <li><a href="#pricing">Pricing</a></li>
     <li><a href="https://calendly.com/pittlasanddeep/30min" target="_blank" class="nav-cta">Engage With Us</a></li>
   </ul>
+</nav>
 
 <!-- ─── HERO ─────────────────────────────── -->
 <section class="hero">
@@ -1646,22 +1573,6 @@ document.addEventListener('mousemove', e => {
 // Nav
 const nav = document.getElementById('nav');
 addEventListener('scroll', ()=> nav.classList.toggle('solid', scrollY>50));
-
-// Hamburger
-const hamburger = document.getElementById('hamburger');
-const navLinks = document.getElementById('navLinks');
-hamburger.addEventListener('click', () => {
-  hamburger.classList.toggle('open');
-  navLinks.classList.toggle('open');
-  document.body.style.overflow = navLinks.classList.contains('open') ? 'hidden' : '';
-});
-document.querySelectorAll('.nav-mobile-link').forEach(link => {
-  link.addEventListener('click', () => {
-    hamburger.classList.remove('open');
-    navLinks.classList.remove('open');
-    document.body.style.overflow = '';
-  });
-});
 
 // Service tabs
 document.querySelectorAll('.svc-tab').forEach(tab => {
