@@ -259,7 +259,31 @@ const fmtD=t=>t?new Date(t).toLocaleDateString("en-IN",{day:"numeric",month:"sho
 const ago=t=>{const h=(Date.now()-new Date(t))/36e5;return h<1?Math.max(1,Math.round(h*60))+" min ago":h<24?Math.round(h)+"h ago":Math.round(h/24)+"d ago"};
 const ls={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 function toast(t){const d=document.createElement("div");d.className="toast";d.setAttribute("role","status");d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2800)}
-const use=n=>Promise.resolve(null);
+const AI_RELAY="https://recruiter-desk-ai.pittlasanddeep.workers.dev/";
+function aiParse(t){t=String(t||"").replace(/<think>[\s\S]*?<\/think>/g,"").trim();const f=t.match(/```(?:json)?\s*([\s\S]*?)```/);if(f)t=f[1].trim();try{return JSON.parse(t)}catch(e){}const a=t.indexOf("{"),b=t.indexOf("[");const st=a<0?b:b<0?a:Math.min(a,b);if(st<0)throw {code:"invalid_json",text:t};const end=Math.max(t.lastIndexOf("}"),t.lastIndexOf("]"));try{return JSON.parse(t.slice(st,end+1))}catch(e){throw {code:"invalid_json",text:t}}}
+async function aiCall(system,messages,max){if(!AI_RELAY||AI_RELAY.startsWith("__"))throw {code:"not_granted"};let r;try{r=await fetch(AI_RELAY,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({system,messages,max_tokens:max||900})})}catch(e){throw {code:"unavailable"}}
+  if(r.status===429)throw {code:"rate_limited"};if(!r.ok)throw {code:"upstream_error"};const d=await r.json();return d.text||""}
+const toMsgs=input=>typeof input==="string"?[{role:"user",content:input}]:input.map(m=>({role:m.role,content:m.content}));
+function demoAI(){
+  const s=async(input,opts={})=>{
+    if(opts.tools&&opts.tools.length){
+      const t=n=>opts.tools.find(x=>x.name===n),ctx={};
+      for(const [k,n,a] of [["pipeline","pipeline_summary",{}],["attention","attention_items",{}],["requisitions","list_requisitions",{}],["interviews","list_interviews",{}],["jobs","list_jobs",{}],["candidates","search_candidates",{limit:40}]]){try{if(t(n))ctx[k]=await t(n).execute(a)}catch(e){}}
+      const msgs=toMsgs(input),last=msgs[msgs.length-1];const m=last.content.match(/candidate id (\w+)/);if(m&&t("get_candidate")){try{ctx.candidateDetail=await t("get_candidate").execute({id:m[1]})}catch(e){}}
+      const sys=`You are Recruiter AI in a recruitment operations app. Answer ONLY from the DATA below; never invent people, numbers or dates. Lead with the answer, then short "- " bullets, under 160 words, names not ids, money in ₹ LPA.
+You cannot send messages or change records. You may propose up to 5 actions for the recruiter to approve. Allowed kinds: draft_message (needs candidateId, recipient and the full message), run_ai_screen, hold, reassign (needs "to" = an existing recruiter), open_candidate, prepare_rejection (opens a review; never rejects). Never base anything on protected traits.
+Reply with ONLY JSON: {"answer":"markdown text","actions":[{"kind":"","candidateId":"","title":"","detail":"","recipient":"","message":"","to":""}]}
+DATA:
+${JSON.stringify(ctx).slice(0,45000)}`;
+      const raw=await aiCall(sys,msgs.map((x,i)=>i===0?{...x,content:x.content.replace(/^You are Recruiter AI[\s\S]*?\n\n(?=\S)/,"")}:x),1200);
+      let ans,acts=[];try{const o=aiParse(raw);ans=String(o.answer||"");acts=Array.isArray(o.actions)?o.actions:[]}catch(e){ans=raw}
+      for(const a of acts.slice(0,5)){if(!a||!a.kind||!a.title)continue;try{await t("propose_action").execute(Object.fromEntries(Object.entries(a).filter(([k,v])=>v!==""&&v!=null)))}catch(e){}}
+      opts.onText&&opts.onText({text:ans});return {text:ans}}
+    const text=(await aiCall("You are Recruiter AI, a careful, inclusive recruitment assistant for Indian IT services companies. Follow the instructions exactly.",toMsgs(input),1100)).replace(/<think>[\s\S]*?<\/think>/g,"").trim();
+    opts.onText&&opts.onText({text});return {text}};
+  s.json=async(input,opts={})=>aiParse(await aiCall("You return only valid JSON that matches the requested shape. No prose, no code fences.",toMsgs(input),1500));
+  return s}
+const use=n=>Promise.resolve(n==="sample"?demoAI():null);
 const inr=v=>v===""||v==null?"–":"₹"+v+" LPA";
 const initials=n=>String(n||"?").split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0].toUpperCase()).join("");
 
@@ -513,7 +537,7 @@ window.sendChat=async()=>{
   const p=$("#prompt"),text=(p?p.value:chat.draft).trim();if(!text||chat.busy)return;
   const s=await ai();
   chat.msgs.push({role:"user",text});chat.draft="";
-  if(!s){chat.msgs.push({role:"assistant",text:"",error:"Recruiter AI isn't connected in this demo. It switches on in the live version."});lastMain="";render();return}
+  if(!s){chat.msgs.push({role:"assistant",text:"",error:"Recruiter AI isn't reachable right now. Try again in a minute."});lastMain="";render();return}
   const reply={role:"assistant",text:"",cards:[],status:"Reading your pipeline…"};chat.msgs.push(reply);chat.busy=true;lastMain="";render();
   const pre=`You are Recruiter AI inside Recruiter Desk, an AI recruitment operations layer on top of ${S.settings.org}'s ATS (${S.settings.ats}). Today is ${new Date().toDateString()}. The person asking is ${demo()?"a demo user who can see every role's data":me()+" (roles: "+myRoles().join(", ")+")"}. Only discuss data the tools return; they are already filtered to what this person may see. Requisitions (hiring needs and budget approvals) are available via list_requisitions; AI never approves budget or rejects requisitions.
 Rules: use the tools to read live data before answering; never invent candidates, numbers or dates; if data is missing, say so. You cannot send messages or change records. To suggest an action, call propose_action (one call per action); the recruiter approves each card. AI recommends; humans decide. Never base anything on protected traits. Never propose rejecting someone outright; use prepare_rejection only when the evidence clearly supports it. Money is ₹ LPA.
@@ -528,7 +552,7 @@ Style: lead with the answer, then short bullets. Refer to candidates by name, ne
   try{
     const r=await s(merged,{tools:aiTools(proposals),modelTier:"default",cache:false,onText:({text})=>{reply.text=text;lastMain="";render()}});
     reply.text=r.text||reply.text||"Done.";
-  }catch(e){reply.error=e&&e.code==="not_granted"?"AI access was declined for this page.":e&&e.code==="rate_limited"?"Recruiter AI is busy. Try again in a minute.":"Something went wrong. Try again.";if(e&&e.text)reply.text=e.text}
+  }catch(e){reply.error=e&&e.code==="not_granted"?"AI access was declined for this page.":e&&e.code==="rate_limited"?"Recruiter AI has reached its demo limit for now. Try again later.":"Something went wrong. Try again.";if(e&&e.text)reply.text=e.text}
   reply.cards=proposals;delete reply.status;chat.busy=false;lastMain="";render();
 };
 
@@ -646,7 +670,7 @@ function vIntegrations(){const s=S.settings;
   ${card("Calendar","Not connected","plain","Panel availability and calendar invites need Google Calendar or Outlook access.")}
   ${card("Video meetings","Manual links","plain","Paste Teams, Zoom or Meet links into each round. Automatic links and recordings need connectors.")}
   ${card("Messaging","Not connected","plain","Teams, Slack and WhatsApp Business alerts. Alerts collect in Recruiter Desk for now.")}
-  ${card("Recruiter AI","Demo","gold","Screening, summaries, rejection drafts and the copilot. Not connected in this demo; it switches on in the live version.")}</div>
+  ${card("Recruiter AI","Demo","gold","Screening, summaries, rejection drafts and the copilot. This demo runs on open-source models with a daily limit; the live version uses a stronger model.")}</div>
   <div class="notice">Production connections need customer-authorised credentials, vendor API access and a security review.</div>`}
 window.csvModal=()=>modal(`<h2>Import candidates from ${esc(S.settings.ats)}</h2><p class="sub" style="margin:0">Export candidates from your ATS and paste the CSV. Header: name, email, phone, source, job. The job column must match a job title here.</p>
   <textarea id="csv" rows="7" placeholder="name,email,phone,source,job&#10;Aarav Mehta,aarav@example.com,9876543210,Naukri,Senior Java Developer (sample)"></textarea>
@@ -897,7 +921,7 @@ async function ai(){if(sampleNs)return sampleNs;sampleNs=await use("sample");ret
 window.runScreen=async id=>{
   const c=S.cands[id],j=jobOf(c);
   if(!c.resume){toast("Add the resume text first");return}
-  const s=await ai();if(!s){toast("Recruiter AI isn't connected in this demo. It switches on in the live version.");return}
+  const s=await ai();if(!s){toast("Recruiter AI isn't reachable right now. Try again in a minute.");return}
   busy.add(id);if(route().id===id)ui.ptab="ai";lastMain="";render();
   try{
     const r=await s.json(`You are a careful recruiting screener. Compare the resume to the job. Judge only job-relevant evidence. Ignore and never mention name, gender, age, religion, caste, marital status, photos, nationality or other protected traits.
@@ -921,7 +945,7 @@ ${c.resume.slice(0,12000)}`,{modelTier:"default"});
     log(cc,`AI screen: ${cc.screen.score}%, recommends ${cc.screen.recommendation}`,"Recruiter AI");
     await put("cand",cc);
     await pushAlert("AI screen ready",`${cc.name} for ${j.title}: ${cc.screen.score}% match, AI recommends ${cc.screen.recommendation}. Your decision is needed.`,id,cc.screen.recommendation==="Reject"?"warn":"info");
-  }catch(e){busy.delete(id);lastMain="";render();toast(e&&e.code==="not_granted"?"AI access was declined for this page":e&&e.code==="rate_limited"?"AI is busy. Try again in a minute.":"AI screening failed. Try again.")}
+  }catch(e){busy.delete(id);lastMain="";render();toast(e&&e.code==="not_granted"?"AI access was declined for this page":e&&e.code==="rate_limited"?"Recruiter AI has reached its demo limit for now. Try again later.":"AI screening failed. Try again.")}
 };
 
 /* interviews */
